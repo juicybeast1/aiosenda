@@ -1,0 +1,529 @@
+﻿
+<!DOCTYPE html>
+<html class="hasSidebar hasPageActions hasBreadcrumb conceptual has-default-focus theme-light" lang="en-us" dir="ltr" data-css-variable-support="true" data-authenticated="false" data-auth-status-determined="false" data-target="docs" x-ms-format-detection="none">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+
+    <!--Import vue3-->
+    <script src="https://unpkg.com/vue@next"></script>
+    <!--Import vue3 done-->
+    <!--Import element plus-->
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
+    <script src="https://unpkg.com/element-plus/dist/index.full.js"></script>
+    <script src="https://unpkg.com/element-plus@1.1.0-beta.11/dist/locale/zh-cn"></script>
+    <!--Import element plus done-->
+
+    <script src="moment.min.js"></script>
+    <script src="moment.zh-cn.min.js"></script>
+
+
+    <!-- Import vue3 -->
+    <!--<script src="vue.global.js"></script>-->
+    <!-- Import vue3 done -->
+    <!-- Import element plus -->
+    <!--<link rel="stylesheet" href="element-plus-index.css" />
+    <script src="element-plus-index.full.js" "></script>-->
+    <!-- Import element plus done -->
+
+    <style type="text/css">
+        body {
+            font-family: Segoe UI,SegoeUI,Helvetica Neue,Helvetica,Arial,sans-serif;
+        }
+
+        .el-tabs__item {
+            font-size: 18px;
+        }
+    </style>
+
+</head>
+<body>
+    <div id="app" style="visibility: hidden;">
+        <!--<div> {{message}} </div>
+    <el-button>{{ message }}</el-button> -->
+        <!-- login dialog -->
+        <el-dialog v-model="loginVisible" title="注册登录" center :before-close="handleLoginClose" close-on-click-modal=false close-on-press-escape=false>
+            <el-form :model="form">
+                <el-form-item label="邮箱">
+                    <el-input v-model="form.userName"></el-input>
+                </el-form-item>
+
+                <el-form-item label="密码">
+                    <el-input v-model="form.password" show-password></el-input>
+                </el-form-item>
+                <el-form-item label="密码确认" v-show="isRegister">
+                    <el-input v-model="form.passwordConfirm" show-password></el-input>
+                </el-form-item>
+
+
+            </el-form>
+            <template #footer>
+                <span class="dialog-footer">
+                    <el-button @click="switchToRegister" v-show="!isRegister">注册新用户</el-button>
+                    <el-button type="primary" v-show="!isRegister" @click="startLogin">登录</el-button>
+                    <br />
+                    <el-link style="margin-top: 12px; font-size: 8px;" type="info" v-show="!isRegister" @click="resetPassword">忘记密码</el-link>
+
+                    <el-button @click="registerUser" v-show="isRegister">注册</el-button>
+                    <el-button @click="switchToLogin" v-show="isRegister">返回登录</el-button>
+                </span>
+            </template>
+
+        </el-dialog>
+
+        <el-dialog v-model="resetPassVisible" title="重置密码">
+            <el-form>
+                <el-form-item label="邮箱">
+                    <el-input v-model="form.resetPassMail"></el-input>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <span class="dialog-footer">
+                    <el-button @click="resetPassVisible = false">取消</el-button>
+                    <el-button @click="requestResetPass">发送重置邮件</el-button>
+                </span>
+            </template>
+        </el-dialog>
+
+        <el-dialog v-model="changePasswordVisible" title="修改密码">
+            <el-form>
+                <el-form-item label="新密码">
+                    <el-input show-password v-model="form.newPass"></el-input>
+                </el-form-item>
+                <el-form-item label="确认密码">
+                    <el-input show-password v-model="form.newPassConfirm"></el-input>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <span class="dialog-footer">
+                    <el-button @click="changePasswordVisible = false">取消</el-button>
+                    <el-button @click="requestChangePass">确定</el-button>
+                </span>
+            </template>
+        </el-dialog>
+
+        
+
+        <!-- upgrade sub -->
+        <el-dialog v-model="upgradeSubVisible" title="升级订阅" top="20px" width="55%">
+            <el-space size="small" wrap>
+
+                <el-form :model="form" inline>
+                    <el-form-item label="等级">
+                        <el-select v-model="form.level" placeholder="等级">
+                            <el-option label="2" value="2"></el-option>
+                        </el-select>
+                    </el-form-item>
+
+                    <el-form-item label="新增流量">
+                        <!--<el-slider v-model="form.extendBandwidthGB"></el-slider>-->
+                        <el-input-number precision="0" v-model="form.extendBandwidthGB" controls-position="right" step="5" @change="upgradeSub()"></el-input-number> GB
+                    </el-form-item>
+
+                    <el-form-item label="续期">
+                        <el-date-picker v-model="form.extendTime" @change="upgradeSub()"></el-date-picker>
+                    </el-form-item>
+
+                </el-form>
+
+                <el-descriptions title="升级前" border size="small">
+                    <el-descriptions-item label="等级"> {{selectedUserSub.level}} </el-descriptions-item>
+                    <el-descriptions-item label="周期流量">{{selectedUserSub.durationBandwidthR}}</el-descriptions-item>
+                    <el-descriptions-item label="结束时间">{{epochFormat(selectedUserSub.endTs)}}</el-descriptions-item>
+                </el-descriptions>
+                <el-descriptions title="升级后" border size="small">
+                    <el-descriptions-item label="等级"> {{upgradedUserSub.level}} </el-descriptions-item>
+                    <el-descriptions-item label="周期流量">{{upgradedUserSub.durationBandwidthR}}</el-descriptions-item>
+                    <el-descriptions-item label="结束时间">{{epochFormat(upgradedUserSub.endTs)}}</el-descriptions-item>
+                </el-descriptions>
+
+            </el-space>
+            <template #footer>
+                <span class="dialog-footer">
+                    <el-form inline>
+                        <el-form-item label="价格">
+                            <label>{{priceFormat(upgradePrice)}} 元</label>
+                        </el-form-item>
+                    </el-form>
+
+                    <el-button @click="resetUpgradeSub">取消</el-button>
+                    <el-button type="primary" @click="upgradeSubToBuy()">确认</el-button>
+                </span>
+            </template>
+
+
+        </el-dialog>
+
+
+        <div>
+            <el-tabs @tab-click="mainTabClick" style="margin-left: 6px; margin-right: 6px;" v-model="tabName">
+                <el-tab-pane label="服务器" name="serverTab">
+                    <el-table :data="tableData" highlight-current-row stripe style="width: 100%" @row-click="selectServer">
+                        <el-table-column prop="country" label="区域" sortable>
+                            <template v-slot="scope">
+                                <el-image style="height: 40px; height:40px;" fit="contain" :src="flagSrc(scope.row.country)"></el-image>
+                            </template>
+                        </el-table-column>
+                        <el-table-column sortable prop="serverGroup" label="组别"> </el-table-column>
+                        <el-table-column prop="city" label="地址"> </el-table-column>
+                        <el-table-column sortable prop="downloadSpeedBps" :formatter="formatSpeed" label="速度"> </el-table-column>
+                    </el-table>
+
+                    <el-button v-on:click="connectServer()">连接</el-button>
+                    <el-button v-on:click="disconnect()">断开连接</el-button>
+
+
+                    <el-button v-on:click="doTest()">速度测试</el-button>
+                </el-tab-pane>
+
+
+
+                <el-tab-pane label="购买" name="buyTab">
+
+                    <el-card class="box-card" v-for="plan in plans.plans" style="display:inline-flex; margin-right: 20px; width: 180px; ">
+                        <div class="card-header">
+                            <span>{{plan.id}}</span>
+                        </div>
+                        <div>{{durationFormat(plan.durationMs)}}</div>
+                        <div>{{plan.durationBandwidthR}}</div>
+                        <el-button class="button" type="text" @click="buyPlan(plan)">购买</el-button>
+                    </el-card>
+
+                </el-tab-pane>
+
+
+                <el-tab-pane label="我的订阅" name="subTab">
+                    <el-table highlight-current-row :data="userSubs.subs" stripe style="width: 100%" @row-click="selectUserSub">
+                        <el-table-column prop="endTs" :formatter="cellEpochFormat" label="结束时间" sortable> </el-table-column>
+                        <el-table-column prop="durationMs" :formatter="cellDurationFormat" label="周期"> </el-table-column>
+                        <el-table-column prop="durationBandwidthR" label="周期流量"> </el-table-column>
+                        <el-table-column prop="bandwidthCurrentR" label="当期流量"> </el-table-column>
+                        <el-table-column prop="bandwidthLeftR" label="剩余流量"> </el-table-column>
+                    </el-table>
+                    <el-button @click="upgradeSubVisible=true">升级</el-button>
+                </el-tab-pane>
+
+
+                <el-tab-pane label="我的账单" name="invoiceTab">
+                    <el-table highlight-current-row :data="payloads.payloads" :default-sort="invoiceTableSort" stripe style="width: 100%" @row-click="selectPayload">
+                        <el-table-column prop="id" label="账单"> </el-table-column>
+                        <el-table-column sortable prop="createDate" :formatter="cellEpochFormat" label="创建时间"> </el-table-column>
+                        <el-table-column prop="planId" label="套餐"> </el-table-column>
+                        <el-table-column prop="timeToExtendMs" :formatter="cellDurationFormat" label="续期"> </el-table-column>
+                        <el-table-column prop="bandwidthToExtendR" label="增加流量"> </el-table-column>
+                        <el-table-column sortable prop="consumed" label="支付状态">
+                            <template v-slot="scope">
+                                <label v-show="scope.row.consumed">支付完成</label>
+                                <!--<label v-show="!scope.row.consumed">未支付</label>-->
+                                <el-link v-show="!scope.row.consumed" @click="payPayload(scope.row)">去支付</el-link>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="priceCnPromo" label="价格">
+                        </el-table-column>
+                    </el-table>
+                </el-tab-pane>
+
+                <el-tab-pane label="设置" name="userTab">
+                    <el-space direction="vertical">
+                        <el-form>
+                            <el-form-item label="用户"> <label>{{user.userName}}</label> </el-form-item>
+                            <el-button @click="changePasswordVisible = true">修改密码</el-button>
+                            <el-button @click="logout">注销</el-button>
+                        </el-form>
+                        <el-form>
+                            <el-form-item label="Socks端口">
+                                <el-input v-model="pref.socksPort"></el-input>
+                            </el-form-item>
+                            <el-form-item label="测速时间">
+                                <el-input v-model="pref.downloadTestSeconds"></el-input>秒
+                            </el-form-item>
+                            <el-button @click="savePref">保存配置</el-button>
+                        </el-form>
+                    </el-space>
+
+                </el-tab-pane>
+
+            </el-tabs>
+        </div>
+
+
+
+    </div>
+
+
+    <script>
+        moment.locale("zh-cn");
+        const appData = {
+            setup() {
+                const state = reactive({
+                    form: {
+                        userName: '',
+                        extendBandwidthGB: 0,
+                        password: '',
+                        passwordConfirm: '',
+                        extendTime: new Date(Date.now() - 86400000),
+                        extendTimeTs: 0,
+                        resetPassMail: '',
+                        newPass: '',
+                        newPassConfirm: '',
+                    },
+                });
+                return {
+                    ...toRefs(state),
+                }
+            },
+            data() {
+
+                return {
+                    message: 'aiong main!',
+                    tableData: [],
+                    user: {},
+                    userSubs: {},
+                    plans: {},
+                    payloads: {},
+                    upgradeSubDialogVisible: false,
+                    upgradeSubVisible: false,
+                    extendTime: toRef(''),
+                    loginVisible: false,
+                    isRegister: false,
+                    selectedUserSub: {},
+                    selectedServer: {},
+                    upgradedUserSub: {},
+                    upgradePrice: 0,
+                    tabName: "serverTab",
+                    upgradeTimer: null,
+                    invoiceTableSort: { prop: 'createDate', order: 'descending' },
+                    pref: {},
+                    resetPassVisible: false,
+                    changePasswordVisible: false,
+                }
+            },
+            mounted() {
+            },
+
+            methods: {
+                updateMessage(msg) {
+                    this.message = msg
+                },
+                connectServer() {
+                    console.log("connectServer");
+                    postMsgToHost({
+                        cmd: "connectServer",
+                        server: this.selectedServer
+                    });
+                },
+                disconnect() {
+                    postMsgToHost({ cmd: "disconnect" });
+                },
+                selectServer(row, column, event) {
+                    //console.log("selectServer");
+                    this.selectedServer = row;
+                },
+                selectUserSub(row, column, event) {
+                    this.selectedUserSub = row;
+                    this.upgradedUserSub = Object.assign({}, row);
+                },
+                mainTabClick(tab) {
+                    console.log("mainTabClick");
+                    if (tab.paneName == "subTab") {
+                        postMsgToHost({ cmd: "requestUserSubs" });
+                    } else if (tab.paneName == "buyTab") {
+                        postMsgToHost({ cmd: "requestSubPlans" });
+                    } else if (tab.paneName == "invoiceTab") {
+                        postMsgToHost({ cmd: "requestPayloads" });
+                    } else if (tab.paneName == "serverTab") {
+                        postMsgToHost({ cmd: "requestServers" });
+                    }
+                    
+                },
+                buyPlan(plan) {
+                    postMsgToHost({
+                        cmd: "buySubPlan",
+                        plan: plan
+                    });
+                },
+                doTest() {
+                    postMsgToHost({ cmd: "doTest" });
+                },
+                handleLoginClose(done) {
+                    console.log("handleLoginClose prevent close");
+                },
+                switchToRegister() {
+                    myApp.isRegister = true;
+                },
+                switchToLogin() {
+                    myApp.isRegister = false;
+                },
+                startLogin() {
+                    postMsgToHost({ cmd: "startLogin", form: this.form });
+                },
+                registerUser() {
+                    postMsgToHost({ cmd: "registerUser", form: this.form });
+                },
+                upgradeSub() {
+                    //https://stackoverflow.com/questions/1909441/how-to-delay-the-keyup-handler-until-the-user-stops-typing/1909508#1909508
+                    if (this.upgradeTimer != null) {
+                        clearTimeout(this.upgradeTimer);
+                    }
+                    this.upgradeTimer = setTimeout(() => {
+                        this.upgradeTimer = null;
+                        this.form.extendTimeTs = this.form.extendTime.getTime();
+                        postMsgToHost({ cmd: "upgradeSub", form: this.form, userSub: this.selectedUserSub, forShow: true });
+                    }, 1000);
+                    
+                },
+                resetUpgradeSub() {
+                    this.upgradeSubVisible = false;
+                    this.form.extendBandwidthGB = 0;
+                    this.form.extendTime = new Date(Date.now() - 86400000);
+                },
+                upgradeSubToBuy() {
+                    postMsgToHost({ cmd: "upgradeSub", form: this.form, userSub: this.selectedUserSub, forShow: false });
+                    this.resetUpgradeSub();
+                },
+                cellEpochFormat(row, column, cellValue, index) {
+                    //return new Date(cellValue).toUTCString();
+                    return moment(cellValue).format("ll LTS"); //LLL, lll, ll LTS
+                },
+                cellDurationFormat(row, column, cellValue, index) {
+                    return moment.duration(cellValue).humanize();
+                },
+                durationFormat(value) {
+                    return moment.duration(value).humanize();
+                },
+                epochFormat(value) {
+                    return moment(value).format("ll LTS"); //LLL, lll, ll LTS
+                },
+                priceFormat(value) {
+                    return value.toFixed(2);
+                },
+                formatSpeed(row, column, cellValue, index) {
+                    return row.downloadSpeedR; //LLL, lll, ll LTS
+                },
+                flagSrc(country) {
+                    var src = 'https://www.countryflags.io/' + country + '/flat/64.png';
+                    //console.log("flagSrc " + src);
+                    return src;
+                },
+                logout() {
+                    this.user = {};
+                    this.payloads = {};
+                    this.userSubs = {};
+                    postMsgToHost({ cmd: "logout" });
+                },
+                savePref() {
+                    postMsgToHost({ cmd: "savePref", pref: this.pref });
+                },
+                resetPassword() {
+                    this.resetPassVisible = true;
+                },
+                requestResetPass() {
+                    postMsgToHost({ cmd: "requestResetPass", form: this.form });
+                    this.resetPassVisible = false;
+                },
+                requestChangePass() {
+                    postMsgToHost({ cmd: "requestChangePass", form: this.form });
+                    this.changePasswordVisible = false;
+                },
+                payPayload(payload) {
+                    postMsgToHost({ cmd: "payPayload", payload: payload });
+                },
+                
+            }
+        }
+
+        const { defineComponent, ref, reactive, toRefs, toRef } = Vue;
+        var myApp = Vue.createApp(appData).use(ElementPlus, {locale: ElementPlus.lang.zhCn}).mount("#app");
+        console.log("mounted " + myApp.message)
+        //myApp.message = "ooooooooooo";
+        document.getElementById("app").style.visibility = "visible";
+
+        window.chrome.webview.addEventListener('message', event => {
+            console.log("chrome event: " + event.data);
+            const d = event.data;
+            const dataObj = d.obj;
+            var cmd = d.cmd;
+            if (cmd == "cmdname") {
+            } else if (cmd == "loadServers") {
+                myApp.tableData = dataObj.servers;
+            } else if (cmd == "msgPrompt") {
+                showMsgPrompt(dataObj);
+            } else if (cmd == "loadUserSubs") {
+                myApp.userSubs = dataObj;
+            } else if (cmd == "loadSubPlans") {
+                myApp.plans = dataObj;
+            } else if (cmd == "loadPayloads") {
+                myApp.payloads = dataObj;
+            } else if (cmd == "showLogin") {
+                myApp.loginVisible = true;
+            } else if (cmd == "successLogin") {
+                myApp.loginVisible = false;
+            } else if (cmd == "upgradeSubRes") {
+                if (dataObj.desc) {
+
+                }
+                if (dataObj.priceCn > 0) {
+                    myApp.upgradePrice = dataObj.priceCn;
+                }
+            } else if (cmd == "loadUser") {
+                myApp.user = dataObj;
+            } else if (cmd == "loadPref") {
+                myApp.pref = dataObj;
+            }
+            
+
+
+
+        });
+
+        /**
+         * postMsgToHost
+         */
+        function postMsgToHost(msg) {
+            window.chrome.webview.postMessage(msg);
+        }
+
+        postMsgToHost({ "cmd": "webCreated" });
+
+        /**
+         * showMsgPrompt
+         */
+        function showMsgPrompt(msg) {
+            //const useMsg = true;
+            const useMsg = false;
+            msg.center = true;
+            if (!msg.type) {
+                msg.type = "success";
+            }
+            if (useMsg) {
+                myApp.$message.success({
+                    message: msg.msg,
+                    type: msg.type
+                });
+            } else {
+                if (!msg.title && msg.msg) {
+                    msg.title = msg.msg;
+                    msg.msg = '';
+                }
+                myApp.$notify.success({
+                    title: (msg.title ? msg.title : ''),
+                    message: msg.msg,
+                    showClose: false
+                });
+            }
+        }
+
+
+
+
+
+
+
+    </script>
+
+
+
+</body>
+</html>
